@@ -19,11 +19,86 @@ app.json.compact = False
 migrate = Migrate(app, db)
 
 db.init_app(app)
-
+api = Api(app)
 
 @app.route('/')
 def home():
     return ''
+
+class Campers(Resource):
+    def get(self):
+        campers = Camper.query.all()
+        return [{'id': camper.id, 'name': camper.name, 'age': camper.age} for camper in campers], 200 
+    def post(self):
+        try:
+            new_camper = Camper(name=request.json['name'], age=request.json['age'])
+        except:
+            return make_response({'errors': 'Validation errors'}, 400)
+        
+        db.session.add(new_camper)
+        db.session.commit()
+
+        return make_response(new_camper.to_dict(), 201,)
+
+class CamperById(Resource):
+    def get(self, id):
+        camper = Camper.query.filter_by(id=id).first()
+
+        if camper is None:
+            return make_response({'error': 'Camper not found'}, 404)
+        
+        return camper.to_dict(), 200
+    
+    def patch(self, id):
+        try:
+            camper = Camper.query.filter_by(id=id).first()
+            if camper is None:
+                return make_response({'error': 'Camper not found'}, 404)
+            
+            camper.name = request.json.get('name', camper.name)
+            camper.age = request.json.get('age', camper.age)
+        except:
+            return make_response({'errors': ['validation errors']}, 400)
+        
+        db.session.commit()
+
+        return camper.to_dict(), 202
+
+class Activities(Resource):
+    def get(self):
+        activities = Activity.query.all()
+        return [{'id': activity.id, 'name': activity.name, 'difficulty': activity.difficulty} for activity in activities], 200
+
+class ActivityById(Resource):
+    def delete(self, id):
+        activity = Activity.query.filter_by(id=id).first()
+
+        if activity is None:
+            return make_response({'error': 'Activity not found'}, 404)
+        
+        db.session.delete(activity)
+        db.session.commit()
+
+        return make_response({'message': 'Activity deleted'}, 204)
+
+class Signups(Resource):
+    def post(self):
+        try:
+            new_signup = Signup(time=request.json['time'], camper_id=request.json['camper_id'], activity_id=request.json['activity_id'])
+        except:
+            return make_response({'errors': ['validation errors']}, 400) 
+        
+        db.session.add(new_signup)
+        db.session.commit()
+
+        return make_response(new_signup.to_dict(), 201,)
+
+
+api.add_resource(Campers, '/campers')
+api.add_resource(CamperById, '/campers/<int:id>')
+api.add_resource(Activities, '/activities')
+api.add_resource(ActivityById, '/activities/<int:id>')
+api.add_resource(Signups, '/signups')
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
